@@ -3,36 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fox Jump - Mobile Edition</title>
+    <title>Fox Jump - Hybrid Controls</title>
     <style>
         body { 
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; 
-            background: #87CEEB; 
-            font-family: 'Segoe UI', sans-serif;
-            touch-action: none; /* Verhindert Zoomen und Scrollen am Handy */
+            margin: 0; padding: 0; overflow: hidden; 
+            background: #87CEEB; font-family: sans-serif;
+            touch-action: none; 
         }
         canvas { display: block; }
+        
         #ui { 
-            position: absolute; 
-            top: env(safe-area-inset-top, 20px); 
-            left: 20px; 
-            font-size: 24px; 
-            color: white; 
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
+            position: absolute; top: 20px; left: 20px; 
+            font-size: 24px; color: white; text-shadow: 2px 2px 4px #000;
             pointer-events: none;
+        }
+
+        /* Der Sprung-Knopf für Mobile */
+        #jumpButton {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 4px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        #jumpButton:active {
+            background: rgba(255, 255, 255, 0.6);
+            transform: scale(0.9);
+        }
+
+        /* Am PC kann der Button kleiner oder dezent sein, falls gewünscht */
+        @media (min-width: 1024px) {
+            #jumpButton { width: 60px; height: 60px; bottom: 20px; right: 20px; opacity: 0.5; }
         }
     </style>
 </head>
 <body>
     <div id="ui">Score: 0</div>
+    <div id="jumpButton">JUMP</div>
+    
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('ui');
+        const jumpBtn = document.getElementById('jumpButton');
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -41,29 +68,20 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // --- Spielparameter ---
         let gameActive = true;
         let score = 0;
-        let gameSpeed = 4;      // Gemütliches Tempo für bessere Kontrolle
-        let gravity = 0.5;      // Niedrige Gravitation für weite Sprünge
+        let gameSpeed = 5;
+        let gravity = 0.5;
 
         const player = {
-            x: 100,
-            y: 0,
-            width: 50,
-            height: 50,
-            velocityY: 0,
-            jumpForce: -25,     // Kraftvoller Absprung
-            minJumpForce: -6,   // Abbruchwert für kurze Sprünge
+            x: 100, y: 0, width: 50, height: 50,
+            velocityY: 0, jumpForce: -16, minJumpForce: -6,
             grounded: false
         };
 
-        // Start mit einer sehr langen Plattform
-        let platforms = [
-            { x: 0, y: canvas.height - 150, width: 1200, height: 60 }
-        ];
+        let platforms = [{ x: 0, y: canvas.height - 150, width: 1200, height: 60 }];
 
-        // --- Steuerung (PC & Mobile) ---
+        // --- ZENTRALE STEUERUNGS-FUNKTIONEN ---
         function startJump() {
             if (gameActive && player.grounded) {
                 player.velocityY = player.jumpForce;
@@ -74,131 +92,80 @@
         }
 
         function endJump() {
-            // Wenn man loslässt, wird der Sprung abgebrochen (variable Höhe)
             if (player.velocityY < player.minJumpForce) {
                 player.velocityY = player.minJumpForce;
             }
         }
 
-        // Keyboard
+        // 1. Computer: Leertaste
         window.addEventListener('keydown', (e) => { if(e.code === 'Space') startJump(); });
         window.addEventListener('keyup', (e) => { if(e.code === 'Space') endJump(); });
 
-        // Touch (Mobile)
-        window.addEventListener('touchstart', (e) => { 
-            e.preventDefault(); 
-            startJump(); 
-        }, { passive: false });
-        window.addEventListener('touchend', (e) => { 
-            e.preventDefault(); 
-            endJump(); 
-        }, { passive: false });
+        // 2. Mobile/Universal: Der Knopf
+        jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startJump(); }, {passive: false});
+        jumpBtn.addEventListener('touchend', (e) => { e.preventDefault(); endJump(); }, {passive: false});
+        
+        // 3. Optional: Klick auf den Knopf (für PC-Maus-Nutzer)
+        jumpBtn.addEventListener('mousedown', startJump);
+        jumpBtn.addEventListener('mouseup', endJump);
 
         function resetGame() {
-            score = 0;
-            player.y = 0;
-            player.velocityY = 0;
+            score = 0; player.y = 0; player.velocityY = 0;
             platforms = [{ x: 0, y: canvas.height - 150, width: 1200, height: 60 }];
             gameActive = true;
         }
 
         function createPlatform() {
             const lastP = platforms[platforms.length - 1];
-            // Lücke zwischen 150 und 350 Pixeln
-            const gap = 150 + Math.random() * 200;
+            const gap = 150 + Math.random() * 250;
             const x = lastP.x + lastP.width + gap;
-            
-            // Höhe anpassen, aber immer erreichbar
             const y = Math.max(200, Math.min(canvas.height - 120, lastP.y + (Math.random() - 0.5) * 200));
             const width = 200 + Math.random() * 300;
-            
             platforms.push({ x, y, width, height: 60 });
         }
 
         function update() {
             if (!gameActive) return;
-
-            // Physik
             player.velocityY += gravity;
             player.y += player.velocityY;
-
-            // Weltbewegung
             platforms.forEach(p => p.x -= gameSpeed);
             score += 0.05;
             scoreElement.innerText = `Score: ${Math.floor(score)}`;
 
-            // Endlos-Generierung
-            if (platforms[platforms.length - 1].x < canvas.width + 300) {
-                createPlatform();
-            }
+            if (platforms[platforms.length - 1].x < canvas.width + 300) createPlatform();
 
-            // Kollisionsprüfung
             player.grounded = false;
             for (let p of platforms) {
-                if (player.x + player.width > p.x && 
-                    player.x < p.x + p.width && 
-                    player.y + player.height > p.y && 
-                    player.y + player.height < p.y + p.height + player.velocityY) {
-                    
+                if (player.x + player.width > p.x && player.x < p.x + p.width && 
+                    player.y + player.height > p.y && player.y + player.height < p.y + p.height + player.velocityY) {
                     player.y = p.y - player.height;
                     player.velocityY = 0;
                     player.grounded = true;
                     break;
                 }
             }
-
-            // Tod in der Lava
-            if (player.y > canvas.height) {
-                gameActive = false;
-            }
-
-            // Aufräumen
-            if (platforms[0].x + platforms[0].width < -200) {
-                platforms.shift();
-            }
+            if (player.y > canvas.height) gameActive = false;
+            if (platforms[0].x + platforms[0].width < -200) platforms.shift();
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Lava-Hintergrund
             ctx.fillStyle = "#FF4500";
             ctx.fillRect(0, canvas.height - 25, canvas.width, 25);
-
-            // Plattformen zeichnen
             platforms.forEach(p => {
-                // Unterbau (Erde)
-                ctx.fillStyle = "#5d4037";
-                ctx.fillRect(p.x, p.y, p.width, p.height);
-                // Gras-Decke
-                ctx.fillStyle = "#4caf50";
-                ctx.fillRect(p.x, p.y, p.width, 15);
+                ctx.fillStyle = "#5d4037"; ctx.fillRect(p.x, p.y, p.width, p.height);
+                ctx.fillStyle = "#4caf50"; ctx.fillRect(p.x, p.y, p.width, 15);
             });
-
-            // Fuchs (Spieler-Platzhalter)
             ctx.fillStyle = "#e67e22";
             ctx.fillRect(player.x, player.y, player.width, player.height);
-            // Weißes Detail (Bauch/Auge)
-            ctx.fillStyle = "white";
-            ctx.fillRect(player.x + 30, player.y + 10, 15, 15);
-
             if (!gameActive) {
                 ctx.fillStyle = "rgba(0,0,0,0.7)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "white";
-                ctx.textAlign = "center";
-                ctx.font = "bold 30px Arial";
+                ctx.fillStyle = "white"; ctx.textAlign = "center"; ctx.font = "30px Arial";
                 ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
-                ctx.font = "20px Arial";
-                ctx.fillText("Tippen zum Neustarten", canvas.width/2, canvas.height/2 + 50);
             }
-
-            requestAnimationFrame(() => {
-                update();
-                draw();
-            });
+            requestAnimationFrame(() => { update(); draw(); });
         }
-
         draw();
     </script>
 </body>
