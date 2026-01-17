@@ -2,11 +2,27 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Fox Jump & Run - Pro Version</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fox Jump - Mobile Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', sans-serif; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background: #87CEEB; 
+            font-family: 'Segoe UI', sans-serif;
+            touch-action: none; /* Verhindert Zoomen und Scrollen am Handy */
+        }
         canvas { display: block; }
-        #ui { position: absolute; top: 20px; left: 20px; font-size: 32px; color: white; text-shadow: 2px 2px 4px #000; font-weight: bold; }
+        #ui { 
+            position: absolute; 
+            top: env(safe-area-inset-top, 20px); 
+            left: 20px; 
+            font-size: 24px; 
+            color: white; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -18,94 +34,110 @@
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('ui');
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
 
-        // --- Spielvariablen ---
-        let gravity = 0.45;
+        // --- Spielparameter ---
         let gameActive = true;
         let score = 0;
-        let gameSpeed = 3; // Viel langsamer als vorher
-        let isJumping = false;
+        let gameSpeed = 4;      // Gemütliches Tempo für bessere Kontrolle
+        let gravity = 0.5;      // Niedrige Gravitation für weite Sprünge
 
         const player = {
-            x: 150,
+            x: 100,
             y: 0,
             width: 50,
-            height: 70,
+            height: 50,
             velocityY: 0,
-            jumpForce: -25,
-            minJumpForce: -6, // Für kurze Sprünge
+            jumpForce: -25,     // Kraftvoller Absprung
+            minJumpForce: -6,   // Abbruchwert für kurze Sprünge
             grounded: false
         };
 
-        // Start mit einer sehr langen Plattform (1000px)
+        // Start mit einer sehr langen Plattform
         let platforms = [
-            { x: 0, y: canvas.height - 180, width: 1000, height: 50 }
+            { x: 0, y: canvas.height - 150, width: 1200, height: 60 }
         ];
 
-        // --- Steuerung ---
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                if (gameActive && player.grounded) {
-                    player.velocityY = player.jumpForce;
-                    player.grounded = false;
-                    isJumping = true;
-                } else if (!gameActive) {
-                    location.reload();
-                }
+        // --- Steuerung (PC & Mobile) ---
+        function startJump() {
+            if (gameActive && player.grounded) {
+                player.velocityY = player.jumpForce;
+                player.grounded = false;
+            } else if (!gameActive) {
+                resetGame();
             }
-        });
+        }
 
-        window.addEventListener('keyup', (e) => {
-            if (e.code === 'Space') {
-                // Wenn wir die Taste loslassen und noch nach oben fliegen:
-                // Brems den Sprung ab (Variable Sprunghöhe)
-                if (player.velocityY < player.minJumpForce) {
-                    player.velocityY = player.minJumpForce;
-                }
-                isJumping = false;
+        function endJump() {
+            // Wenn man loslässt, wird der Sprung abgebrochen (variable Höhe)
+            if (player.velocityY < player.minJumpForce) {
+                player.velocityY = player.minJumpForce;
             }
-        });
+        }
+
+        // Keyboard
+        window.addEventListener('keydown', (e) => { if(e.code === 'Space') startJump(); });
+        window.addEventListener('keyup', (e) => { if(e.code === 'Space') endJump(); });
+
+        // Touch (Mobile)
+        window.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            startJump(); 
+        }, { passive: false });
+        window.addEventListener('touchend', (e) => { 
+            e.preventDefault(); 
+            endJump(); 
+        }, { passive: false });
+
+        function resetGame() {
+            score = 0;
+            player.y = 0;
+            player.velocityY = 0;
+            platforms = [{ x: 0, y: canvas.height - 150, width: 1200, height: 60 }];
+            gameActive = true;
+        }
 
         function createPlatform() {
             const lastP = platforms[platforms.length - 1];
-            // Abstand zwischen Plattformen
-            const gap = 120 + Math.random() * 150; 
+            // Lücke zwischen 150 und 350 Pixeln
+            const gap = 150 + Math.random() * 200;
             const x = lastP.x + lastP.width + gap;
             
-            // Höhe variiert leicht, aber bleibt erreichbar
-            const y = Math.max(250, Math.min(canvas.height - 150, lastP.y + (Math.random() - 0.5) * 150));
-            const width = 150 + Math.random() * 250;
+            // Höhe anpassen, aber immer erreichbar
+            const y = Math.max(200, Math.min(canvas.height - 120, lastP.y + (Math.random() - 0.5) * 200));
+            const width = 200 + Math.random() * 300;
             
-            platforms.push({ x, y, width, height: 50 });
+            platforms.push({ x, y, width, height: 60 });
         }
 
         function update() {
             if (!gameActive) return;
 
-            // Schwerkraft
+            // Physik
             player.velocityY += gravity;
             player.y += player.velocityY;
 
-            // Welt bewegen
+            // Weltbewegung
             platforms.forEach(p => p.x -= gameSpeed);
-            
-            // Score erhöhen
-            score += 0.1;
+            score += 0.05;
             scoreElement.innerText = `Score: ${Math.floor(score)}`;
 
-            // Neue Plattformen am rechten Rand generieren
-            if (platforms[platforms.length - 1].x < canvas.width + 200) {
+            // Endlos-Generierung
+            if (platforms[platforms.length - 1].x < canvas.width + 300) {
                 createPlatform();
             }
 
-            // Kollision
+            // Kollisionsprüfung
             player.grounded = false;
             for (let p of platforms) {
-                if (player.x < p.x + p.width &&
-                    player.x + player.width > p.x &&
-                    player.y + player.height > p.y &&
+                if (player.x + player.width > p.x && 
+                    player.x < p.x + p.width && 
+                    player.y + player.height > p.y && 
                     player.y + player.height < p.y + p.height + player.velocityY) {
                     
                     player.y = p.y - player.height;
@@ -115,52 +147,50 @@
                 }
             }
 
-            // Game Over Bedingung (Lava / Unterer Bildschirmrand)
+            // Tod in der Lava
             if (player.y > canvas.height) {
                 gameActive = false;
             }
 
-            // Alte Plattformen entfernen
-            if (platforms[0].x + platforms[0].width < -100) {
+            // Aufräumen
+            if (platforms[0].x + platforms[0].width < -200) {
                 platforms.shift();
             }
         }
 
         function draw() {
-            // Hintergrund
-            ctx.fillStyle = "#87CEEB";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Lava
+            // Lava-Hintergrund
             ctx.fillStyle = "#FF4500";
-            ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+            ctx.fillRect(0, canvas.height - 25, canvas.width, 25);
 
-            // Plattformen
+            // Plattformen zeichnen
             platforms.forEach(p => {
-                // Erde
+                // Unterbau (Erde)
                 ctx.fillStyle = "#5d4037";
                 ctx.fillRect(p.x, p.y, p.width, p.height);
-                // Gras-Kante
+                // Gras-Decke
                 ctx.fillStyle = "#4caf50";
                 ctx.fillRect(p.x, p.y, p.width, 15);
             });
 
-            // Spieler (Fuchs-Ersatz)
-            ctx.fillStyle = "#e67e22"; // Fuchs-Orange
+            // Fuchs (Spieler-Platzhalter)
+            ctx.fillStyle = "#e67e22";
             ctx.fillRect(player.x, player.y, player.width, player.height);
-            // Kleines Auge für die Richtung
+            // Weißes Detail (Bauch/Auge)
             ctx.fillStyle = "white";
-            ctx.fillRect(player.x + 35, player.y + 10, 10, 10);
+            ctx.fillRect(player.x + 30, player.y + 10, 15, 15);
 
             if (!gameActive) {
-                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillStyle = "rgba(0,0,0,0.7)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
-                ctx.font = "48px Arial";
+                ctx.font = "bold 30px Arial";
                 ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
-                ctx.font = "24px Arial";
-                ctx.fillText("Leertaste zum Neustarten", canvas.width/2, canvas.height/2 + 50);
+                ctx.font = "20px Arial";
+                ctx.fillText("Tippen zum Neustarten", canvas.width/2, canvas.height/2 + 50);
             }
 
             requestAnimationFrame(() => {
